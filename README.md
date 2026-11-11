@@ -8,7 +8,7 @@ Web tĩnh (React + Vite). Dữ liệu cá nhân lưu trong trình duyệt (Index
 - **Vốn từ của tôi**: thêm từ (từng từ / dán cả danh sách / tự nhập), sửa nghĩa, tag, ghi chú.
 - **Ôn tập** ngắt quãng (FSRS), **Kiểm tra nhanh** 6 dạng (chữ→nghĩa, nghĩa→chữ, gõ pinyin, nghe, Hán Việt, viết tay).
 - **Luyện viết** theo từng nét, **Bài đọc AI** & câu ví dụ AI (Claude, cần API key), **Thống kê**.
-- Sao lưu JSON, xuất CSV / Anki, nhập CSV. Chế độ sáng/tối. Cài được như app (PWA).
+- **Đồng bộ nhiều máy qua GitHub Gist**, sao lưu JSON, xuất CSV / Anki, nhập CSV. Chế độ sáng/tối. Cài được như app (PWA).
 
 ## Chạy trên máy
 ```bash
@@ -22,7 +22,7 @@ npm run dev        # http://localhost:5173
    Hoặc **New → Static Site**: Build command `npm ci && npm run build`, Publish directory `dist`.
 3. App dùng hash router (`/#/tra-tu`) nên không cần cấu hình rewrite.
 
-> Dữ liệu học (vốn từ, lịch ôn) nằm trong trình duyệt đang dùng — đổi máy/trình duyệt hoặc xoá dữ liệu duyệt web sẽ không còn. Hãy dùng **Cài đặt → Sao lưu** định kỳ.
+> Dữ liệu học (vốn từ, lịch ôn) nằm trong trình duyệt đang dùng. Để dùng trên nhiều máy/trình duyệt, vào **Cài đặt → Đồng bộ giữa các máy**, dán một GitHub token có quyền `gist`: dữ liệu được tự động lưu vào một gist bí mật và đồng bộ khi mở web, khi thay đổi và khi quay lại tab. Dùng cùng token ở máy khác để có lại toàn bộ vốn từ.
 
 ## Dựng lại database từ điển
 Dữ liệu thô không nằm trong repo. Để tải lại và dựng:

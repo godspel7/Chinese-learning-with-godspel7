@@ -3,6 +3,7 @@ import { db, getSetting, setSetting } from '../lib/db';
 import { exportAnki, exportCsv, exportJson, importCsv, importJson } from '../lib/backup';
 import { getZhVoices, onVoicesChanged, saveTts, speak, ttsSettings, ttsSupported } from '../lib/tts';
 import { toast } from '../components/common';
+import { connectGist, disconnectGist, getSyncState, onSyncState, syncNow, type SyncState } from '../lib/sync';
 
 export default function Settings() {
   const [key, setKey] = useState('');
@@ -16,13 +17,19 @@ export default function Settings() {
   const csvFile = useRef<HTMLInputElement>(null);
   const [replace, setReplace] = useState(false);
   const [usage, setUsage] = useState('');
+  const [ghToken, setGhToken] = useState('');
+  const [ghConnected, setGhConnected] = useState(false);
+  const [ghBusy, setGhBusy] = useState(false);
+  const [sync, setSync] = useState<SyncState>(getSyncState());
 
   useEffect(() => {
     getSetting('anthropicKey', '').then(setKey);
     getSetting('newPerDay', 20).then(setNewPerDay);
+    getSetting('gistToken', '').then((t) => setGhConnected(!!t));
+    const offSync = onSyncState(setSync);
     const off = onVoicesChanged(() => setVoices(getZhVoices()));
     navigator.storage?.estimate?.().then((e) => e.usage && setUsage(`${(e.usage / 1e6).toFixed(1)} MB`));
-    return () => { off(); };
+    return () => { off(); offSync(); };
   }, []);
 
   return (
@@ -68,8 +75,56 @@ export default function Settings() {
       </section>
 
       <section className="card">
+        <h3>Đồng bộ giữa các máy (GitHub Gist)</h3>
+        {ghConnected ? (
+          <>
+            <p className="muted">Vốn từ, lịch ôn tập và bài đọc được tự động lưu lên một gist bí mật trong tài khoản GitHub của bạn.
+              Mở web ở máy/trình duyệt khác và nhập cùng token là có lại toàn bộ dữ liệu.</p>
+            <p>
+              {sync.kind === 'syncing' && <><span className="spinner sm" /> Đang đồng bộ…</>}
+              {sync.kind === 'ok' && <>☁ Đã đồng bộ lúc {new Date(sync.at).toLocaleTimeString('vi-VN')}</>}
+              {sync.kind === 'error' && <span className="error">Lỗi đồng bộ: {sync.msg}</span>}
+              {sync.kind === 'off' && <span className="muted">Chưa đồng bộ lần nào trong phiên này.</span>}
+            </p>
+            <div className="row gap wrap">
+              <button className="btn primary" disabled={sync.kind === 'syncing'} onClick={() => syncNow()}>⟳ Đồng bộ ngay</button>
+              <button className="btn ghost" onClick={async () => {
+                if (!confirm('Ngắt đồng bộ trên trình duyệt này? Dữ liệu ở đây và trên gist vẫn giữ nguyên.')) return;
+                await disconnectGist();
+                setGhConnected(false);
+                setGhToken('');
+              }}>Ngắt kết nối</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="muted">Để dùng vốn từ trên mọi máy: tạo một token GitHub chỉ có quyền <b>gist</b> tại{' '}
+              <a href="https://github.com/settings/tokens/new?scopes=gist&description=Hoc%20tieng%20Trung%20sync" target="_blank" rel="noreferrer">github.com/settings/tokens</a>
+              {' '}(chọn Expiration = No expiration), rồi dán vào đây. Trên máy khác, dán cùng token này.
+              Token chỉ lưu trong trình duyệt và chỉ gửi tới GitHub.</p>
+            <div className="row gap">
+              <input className="input grow" type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="ghp_…" autoComplete="off" />
+              <button className="btn primary" disabled={!ghToken.trim() || ghBusy} onClick={async () => {
+                setGhBusy(true);
+                try {
+                  await connectGist(ghToken);
+                  setGhConnected(true);
+                  toast('Đã kết nối & đồng bộ');
+                } catch (err) {
+                  await disconnectGist();
+                  toast('Lỗi: ' + (err as Error).message);
+                } finally {
+                  setGhBusy(false);
+                }
+              }}>{ghBusy ? 'Đang kết nối…' : 'Kết nối'}</button>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="card">
         <h3>Sao lưu & chuyển dữ liệu</h3>
-        <p className="muted">Dữ liệu của bạn chỉ nằm trong trình duyệt này{usage && ` (đang dùng ${usage})`}. Nên <b>sao lưu định kỳ</b>, vì xoá dữ liệu trình duyệt sẽ mất vốn từ.</p>
+        <p className="muted">Dữ liệu được lưu trong trình duyệt này{usage && ` (đang dùng ${usage})`}. Nếu chưa bật đồng bộ ở trên, nên <b>sao lưu định kỳ</b>, vì xoá dữ liệu trình duyệt sẽ mất vốn từ.</p>
         <div className="row gap wrap">
           <button className="btn primary" onClick={exportJson}>⬇ Sao lưu đầy đủ (.json)</button>
           <button className="btn ghost" onClick={exportCsv}>⬇ Xuất CSV (Excel)</button>

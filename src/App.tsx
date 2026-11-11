@@ -3,6 +3,7 @@ import { createHashRouter, NavLink, Outlet, RouterProvider, useRouteError } from
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './lib/db';
 import { dict } from './lib/dict';
+import { getSyncState, onSyncState, startSync } from './lib/sync';
 import { Spinner, Toaster } from './components/common';
 import Home from './pages/Home';
 import Lookup from './pages/Lookup';
@@ -30,6 +31,7 @@ const NAV = [
 function Layout() {
   const [dictState, setDictState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [count, setCount] = useState(0);
+  const [sync, setSync] = useState(getSyncState());
   const due = useLiveQuery(() => db.words.where('due').belowOrEqual(Date.now()).filter((w) => w.card.state !== 0).count(), [], 0);
   const [theme, setTheme] = useState<string>(() => {
     try { return localStorage.getItem('theme') || ''; } catch { return ''; }
@@ -37,8 +39,10 @@ function Layout() {
 
   useEffect(() => {
     const clearFlag = setTimeout(() => { try { sessionStorage.removeItem('reloaded-for-update'); } catch { /* bỏ qua */ } }, 10000);
+    startSync();
+    const offSync = onSyncState(setSync);
     dict.ready().then((n) => { setCount(n); setDictState('ready'); }, () => setDictState('error'));
-    return () => clearTimeout(clearFlag);
+    return () => { clearTimeout(clearFlag); offSync(); };
   }, []);
   useEffect(() => {
     if (theme) document.documentElement.dataset.theme = theme;
@@ -63,6 +67,13 @@ function Layout() {
             {dictState === 'ready' && <>Từ điển: {count.toLocaleString('vi-VN')} từ</>}
             {dictState === 'error' && <span className="error">Lỗi nạp từ điển</span>}
           </div>
+          {sync.kind !== 'off' && (
+            <NavLink to="/cai-dat" className="muted sm" title={sync.kind === 'error' ? sync.msg : 'Đồng bộ GitHub Gist'}>
+              {sync.kind === 'syncing' && '☁ Đang đồng bộ…'}
+              {sync.kind === 'ok' && '☁ Đã đồng bộ'}
+              {sync.kind === 'error' && <span className="error">☁ Lỗi đồng bộ</span>}
+            </NavLink>
+          )}
           <button className="btn ghost sm" onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? '' : 'dark')}>
             {theme === 'dark' ? '🌙 Tối' : theme === 'light' ? '☀ Sáng' : '◐ Theo hệ thống'}
           </button>
